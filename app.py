@@ -19,6 +19,9 @@ API:
   POST   /api/settings               -> {concurrency, paused}
   GET    /api/file/<id>              -> entrega o arquivo (modo site)
   POST   /api/open/<id>              -> abre arquivo/pasta (modo app)
+  GET    /api/update                 -> estado da atualização automática
+  POST   /api/update/check           -> procura atualização agora
+  POST   /api/update/restart         -> instala a baixada e reabre o app
 """
 
 import json
@@ -36,6 +39,9 @@ from urllib.parse import urlparse
 from flask import Flask, jsonify, request, send_file, send_from_directory
 import yt_dlp
 
+import updater
+from version import VERSION
+
 FROZEN = getattr(sys, "frozen", False)
 # Dentro do .exe os arquivos embutidos ficam em sys._MEIPASS.
 BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -51,6 +57,7 @@ CONFIG = {
     "work_dir": BUNDLE_DIR / "downloads",
     "save_dir": None,    # modo app: pasta final dos arquivos
     "state_file": None,  # modo app: onde a fila pendente é salva
+    "on_restart": None,  # modo app: fecha a janela para instalar atualização
 }
 
 
@@ -482,7 +489,7 @@ def index():
 def config():
     save = CONFIG["save_dir"]
     return jsonify(desktop=CONFIG["desktop"], save_dir=str(save) if save else None,
-                   max_concurrency=MAX_CONCURRENCY)
+                   max_concurrency=MAX_CONCURRENCY, version=VERSION)
 
 
 @app.get("/api/queue")
@@ -679,6 +686,26 @@ def open_result(item_id):
         os.startfile(path)  # type: ignore[attr-defined]
     else:
         subprocess.Popen(["explorer", "/select,", str(path)])
+    return jsonify(ok=True)
+
+
+@app.get("/api/update")
+def update_status():
+    return jsonify(updater.snapshot())
+
+
+@app.post("/api/update/check")
+def update_check():
+    threading.Thread(target=updater.check_and_download, daemon=True).start()
+    return jsonify(updater.snapshot())
+
+
+@app.post("/api/update/restart")
+def update_restart():
+    if not CONFIG["on_restart"] or not updater.request_restart():
+        return jsonify(error="Nenhuma atualização pronta para instalar."), 409
+    persist()
+    CONFIG["on_restart"]()
     return jsonify(ok=True)
 
 

@@ -40,9 +40,12 @@ import webview  # noqa: E402
 from werkzeug.serving import make_server  # noqa: E402
 
 import app as backend  # noqa: E402
+import updater  # noqa: E402
 
 
 def main() -> None:
+    log.info("Downme %s", updater.VERSION)
+    updater.cleanup_old()
     log.info("iniciando (frozen=%s, ffmpeg=%s, js=%s)",
              backend.FROZEN, backend.FFMPEG, backend.BASE_OPTS["js_runtimes"])
     backend.configure(desktop=True, state_file=LOG_DIR / "queue.json")
@@ -51,7 +54,7 @@ def main() -> None:
     server = make_server("127.0.0.1", 0, backend.app, threaded=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
-    webview.create_window(
+    window = webview.create_window(
         "Downme",
         f"http://127.0.0.1:{server.server_port}/",
         width=880,
@@ -59,10 +62,14 @@ def main() -> None:
         min_size=(460, 620),
         background_color="#0e0f13",
     )
+    backend.CONFIG["on_restart"] = lambda: threading.Timer(0.3, window.destroy).start()
     log.info("servidor em 127.0.0.1:%s", server.server_port)
+    updater.start_background_checks()
     webview.start()
     log.info("janela fechada, encerrando")
     server.shutdown()
+    backend.persist()
+    updater.apply_pending()  # instala atualização já baixada (e reabre, se pedido)
 
 
 if __name__ == "__main__":

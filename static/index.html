@@ -151,6 +151,21 @@
     .gh { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; }
     .gh svg { width: 15px; height: 15px; fill: currentColor; }
 
+    .update {
+      display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+      padding: 12px 14px; border-radius: 12px; font-size: 14px;
+      background: rgba(52, 211, 153, .08); border: 1px solid rgba(52, 211, 153, .3);
+    }
+    .update .txt { flex: 1; min-width: 200px; }
+    .update strong { color: var(--ok); }
+    .update small { display: block; color: var(--muted); margin-top: 2px; }
+    .version { margin-top: 6px; }
+    .version button.link {
+      background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-weight: 400;
+      text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+    }
+    .version button.link:hover { color: var(--text); opacity: 1; }
+
     .spinner {
       display: inline-block; width: 12px; height: 12px; vertical-align: -1px;
       border: 2px solid rgba(255,255,255,.25); border-top-color: var(--muted);
@@ -172,6 +187,14 @@
     <h1 class="logo">Downme</h1>
     <p>Cole um ou vários links do YouTube — eles entram na fila e baixam em sequência.</p>
   </header>
+
+  <div class="update" id="updateBox">
+    <div class="txt">
+      <strong id="updateTitle"></strong>
+      <small id="updateSub"></small>
+    </div>
+    <button type="button" class="sm" id="restartBtn">Reiniciar agora</button>
+  </div>
 
   <section class="card">
     <form id="addForm">
@@ -221,6 +244,9 @@
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         Downme no GitHub · @nobackslash
       </a>
+    </div>
+    <div class="version" id="versionLine" hidden>
+      <span id="versionText"></span> · <button type="button" class="link" id="checkBtn">Verificar atualizações</button>
     </div>
   </footer>
 </main>
@@ -507,6 +533,38 @@
     }
   }
 
+  // ---------- atualização automática (só no app) ----------
+  function renderUpdate(u) {
+    const ready = u.status === "ready";
+    $("updateBox").style.display = ready ? "flex" : "none";
+    if (ready) {
+      const busy = state.items.some((x) => ACTIVE.includes(x.status));
+      $("updateTitle").textContent = `Downme ${u.latest} já foi baixado.`;
+      $("updateSub").textContent = busy
+        ? "Instala sozinho quando você fechar o app. Se reiniciar agora, os downloads em andamento recomeçam do zero."
+        : "Instala sozinho quando você fechar o app — ou reinicie agora.";
+    }
+    const status = {
+      checking: "procurando…", downloading: `baixando atualização ${u.percent || 0}%`,
+      latest: "você está na versão mais recente", error: u.error, ready: "atualização pronta",
+    }[u.status];
+    $("versionText").textContent = `Downme ${u.current}` + (status ? ` — ${status}` : "");
+    $("checkBtn").disabled = ["checking", "downloading", "ready"].includes(u.status);
+  }
+  async function pollUpdate() {
+    try { renderUpdate(await api("/api/update")); } catch {}
+  }
+  $("checkBtn").addEventListener("click", async () => {
+    try { renderUpdate(await api("/api/update/check", {})); } catch {}
+    setTimeout(pollUpdate, 800);
+  });
+  $("restartBtn").addEventListener("click", async () => {
+    $("restartBtn").disabled = true;
+    $("restartBtn").textContent = "Reiniciando…";
+    try { await api("/api/update/restart", {}); }
+    catch (err) { showMsg(err.message); $("restartBtn").disabled = false; $("restartBtn").textContent = "Reiniciar agora"; }
+  });
+
   // ---------- polling ----------
   async function refresh() {
     clearTimeout(state.timer);
@@ -522,6 +580,11 @@
     for (let n = 1; n <= (cfg.max_concurrency || 4); n++) sel.add(new Option(String(n), String(n)));
     sel.value = String(state.settings.concurrency);
     state.rows.forEach((row) => { row.html = null; });  // re-renderiza botões do modo app
+    if (state.desktop) {
+      $("versionLine").hidden = false;
+      pollUpdate();
+      setInterval(pollUpdate, 4000);
+    }
   }).catch(() => {}).finally(refresh);
 </script>
 </body>

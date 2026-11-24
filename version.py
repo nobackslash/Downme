@@ -1,4 +1,4 @@
 """Versão do Downme. Para lançar uma nova: aumente aqui e rode release.bat."""
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 REPO = "nobackslash/Downme"

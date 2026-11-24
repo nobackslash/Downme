@@ -5,251 +5,248 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Downme</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
+    /* Tudo branco; o único acento é o ciano/verde-água. */
     :root {
-      --bg: #0e0f13;
-      --card: #171920;
-      --field: #0f1116;
-      --border: #262935;
-      --text: #eceef4;
-      --muted: #8b90a0;
-      --accent: #ff3d57;
-      --accent-2: #ff7a45;
-      --ok: #34d399;
-      --err: #f87171;
-      --warn: #fbbf24;
-      --radius: 16px;
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --sunken: #f1f8f8;
+      --line: #e1eded;
+      --ink: #0f2a2e;
+      --muted: #67868a;
+      --cyan: #06b6d4;
+      --teal: #14b8a6;
+      --accent: #0e9aa7;        /* botões e foco: contraste AA com branco */
+      --accent-ink: #ffffff;
+      --braille: #12a9b5;       /* cor do campo braille de progresso */
+      --ok: #0f8a6c;
+      --err: #c2413a;
+      --warn: #8a6100;
+      --warn-bg: #fff8e5;
+      --focus: 0 0 0 3px rgba(14, 154, 167, .3);
+      --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+      --ui: "Figtree", "Segoe UI", system-ui, sans-serif;
+      --mono: "Cascadia Mono", "Cascadia Code", Consolas, "Segoe UI Symbol", monospace;
+      color-scheme: light;
     }
+
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
-      margin: 0; min-height: 100vh;
-      font-family: Inter, system-ui, sans-serif;
-      background: radial-gradient(1200px 600px at 50% -200px, #2a1520 0%, var(--bg) 60%) var(--bg);
-      color: var(--text);
-      display: flex; justify-content: center; padding: 48px 16px;
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 15px/1.45 var(--ui);
+      display: grid; grid-template-rows: auto auto 1fr auto; grid-template-columns: minmax(0, 1fr);
     }
-    main { width: 100%; max-width: 780px; }
-    header { text-align: center; margin-bottom: 28px; }
-    .logo {
-      font-size: 42px; font-weight: 700; letter-spacing: -1.5px; margin: 0;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    :focus { outline: none; }
+    :focus-visible { box-shadow: var(--focus); border-radius: 8px; }
+
+    /* ---------- entrada ---------- */
+    .intake {
+      display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 18px; align-items: start;
+      padding: 16px 20px 14px; background: var(--surface); border-bottom: 1px solid var(--line);
+    }
+    .brand {
+      font: 700 26px/1 var(--display); letter-spacing: -.02em; margin: 0; padding-top: 9px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .brand span {
+      background: linear-gradient(90deg, var(--cyan), var(--teal));
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    header p { color: var(--muted); margin: 8px 0 0; }
-
-    .card {
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px;
-    }
-    .card + .card { margin-top: 16px; }
-
-    textarea, select {
-      font: inherit; color: var(--text); background: var(--field);
-      border: 1px solid var(--border); border-radius: 12px; outline: none;
-      transition: border-color .15s;
-    }
+    .brand svg { width: 22px; height: 22px; color: var(--cyan); }
+    .entry { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+    .entry > * { flex-shrink: 0; }
     textarea {
-      width: 100%; padding: 14px 16px; resize: vertical; min-height: 54px; max-height: 260px;
-      display: block; line-height: 1.45;
+      flex: 1 1 auto; min-width: 180px; height: 42px; max-height: 168px; resize: none; overflow-y: auto;
+      padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px;
+      background: var(--bg); color: var(--ink); font: inherit; line-height: 1.4;
     }
-    textarea:focus, select:focus { border-color: var(--accent); }
-    select { padding: 8px 10px; font-size: 14px; cursor: pointer; }
-    select:disabled { opacity: .5; cursor: not-allowed; }
+    textarea::placeholder { color: var(--muted); }
+    textarea:focus { border-color: var(--accent); box-shadow: var(--focus); }
 
-    button {
-      font: inherit; font-weight: 600; cursor: pointer; border: 0;
-      border-radius: 12px; padding: 12px 18px; color: #fff;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      transition: opacity .15s, transform .05s, border-color .15s;
+    .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: var(--bg); }
+    .toggle button {
+      border: 0; background: none; color: var(--muted); font: 500 14px var(--ui);
+      padding: 7px 12px; border-radius: 7px; cursor: pointer;
     }
-    button:hover { opacity: .92; }
-    button:active { transform: scale(.98); }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-    button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
-    button.ghost:hover { border-color: #3a3e4d; opacity: 1; }
-    button.sm { padding: 7px 11px; font-size: 13px; font-weight: 500; border-radius: 10px; }
-    button.icon { padding: 7px 9px; min-width: 32px; line-height: 1; }
+    .toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 
-    .add-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
-    .add-row .spacer { flex: 1; }
-    .seg { display: flex; gap: 6px; }
-    .seg button {
-      background: var(--field); border: 1px solid var(--border); color: var(--text);
-      padding: 8px 12px; font-weight: 500; font-size: 14px; border-radius: 10px;
+    select {
+      font: 500 14px var(--ui); color: var(--ink); background: var(--bg);
+      border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; cursor: pointer;
     }
-    .seg button.active { border-color: var(--accent); background: #2a1520; }
-    .field-label { font-size: 13px; color: var(--muted); }
-    .msg { margin-top: 10px; font-size: 14px; color: var(--err); min-height: 1em; }
-    .msg.info { color: var(--muted); }
+    select:focus-visible { border-color: var(--accent); }
+    select:disabled { opacity: .55; cursor: default; }
 
-    /* --- fila --- */
-    .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .toolbar h2 { font-size: 16px; margin: 0; }
-    .toolbar .counts { color: var(--muted); font-size: 13px; }
-    .toolbar .spacer { flex: 1; }
-    .toolbar label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-    .paused-banner {
-      display: none; margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px;
-      background: rgba(251, 191, 36, .08); border: 1px solid rgba(251, 191, 36, .3); color: var(--warn);
+    .btn {
+      font: 600 14px var(--ui); border-radius: 10px; padding: 10px 16px; cursor: pointer;
+      border: 1px solid transparent; background: var(--accent); color: var(--accent-ink);
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:disabled { opacity: .5; cursor: default; filter: none; }
+    .btn.quiet { background: transparent; color: var(--ink); border-color: var(--line); }
+    .btn.quiet:hover { background: var(--sunken); filter: none; }
+    .btn.small { padding: 6px 11px; font-size: 13px; border-radius: 8px; }
+
+    .hint { grid-column: 2; font-size: 13px; color: var(--muted); min-height: 1.3em; }
+    .hint.err { color: var(--err); }
+    .hint kbd {
+      font: 600 12px var(--ui); padding: 1px 5px; border-radius: 4px;
+      border: 1px solid var(--line); border-bottom-width: 2px; background: var(--bg);
     }
 
-    #list { margin-top: 14px; display: grid; gap: 10px; }
-    .empty { text-align: center; color: var(--muted); font-size: 14px; padding: 28px 8px; }
+    /* ---------- faixas de aviso ---------- */
+    .strips:empty { display: none; }
+    .strip { display: flex; align-items: center; gap: 14px; padding: 9px 20px; font-size: 14px; }
+    .strip p { margin: 0; flex: 1; }
+    .strip.update { background: var(--sunken); color: var(--ink); border-bottom: 1px solid var(--line); }
+    .strip.paused { background: var(--warn-bg); color: var(--warn); border-bottom: 1px solid var(--line); }
 
-    .item {
-      display: grid; grid-template-columns: 120px 1fr; gap: 14px;
-      padding: 12px; border-radius: 12px; background: var(--field); border: 1px solid var(--border);
+    /* ---------- fila ---------- */
+    .queue { overflow-y: auto; min-height: 0; }
+    #list { list-style: none; margin: 0; padding: 0; }
+
+    .row {
+      position: relative; isolation: isolate; overflow: hidden;
+      border-bottom: 1px solid var(--line); background: var(--surface);
     }
-    .item.active { border-color: rgba(255, 61, 87, .45); }
-    .item.held { opacity: .7; }
+    /* A linha é a barra de progresso: um campo de braille cintilante
+       enche da esquerda para a direita (desenhado pelo JS, ver braille()). */
+    .braille {
+      position: absolute; inset: 0; z-index: -1; margin: 0; overflow: hidden;
+      font: 13px/14px var(--mono); color: var(--braille); opacity: .42;
+      white-space: pre; pointer-events: none; user-select: none;
+    }
+    .row-in {
+      display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 16px; align-items: center;
+      padding: 12px 20px;
+    }
+    .row.held { background: var(--sunken); }
+    .row.held .thumb, .row.held .title { opacity: .55; }
+    .spin { color: var(--teal); font: 17px/1 var(--mono); display: inline-block; width: 1.2em; vertical-align: -2px; }
+
     .thumb {
-      width: 120px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px;
-      background: #1c1f28; display: block;
+      width: 112px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; display: block;
+      background: var(--sunken);
     }
-    .body { min-width: 0; display: grid; gap: 8px; align-content: start; }
-    .head { display: flex; gap: 10px; align-items: flex-start; }
-    .titles { flex: 1; min-width: 0; }
+    .main { min-width: 0; }
     .title {
-      font-size: 14px; font-weight: 600; line-height: 1.35; margin: 0;
-      overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
-      -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word;
+      margin: 0; font: 500 16px/1.3 var(--display); letter-spacing: -.005em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .sub { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pos { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+    .meta { display: flex; gap: 14px; margin-top: 3px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+    .meta .state { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .row.done .state { color: var(--ok); }
+    .row.active .state { color: var(--accent); }
+    .row.error .state, .meta .why { color: var(--err); }
+    .meta .why { flex-basis: 100%; }
+    .meta .num { font-variant-numeric: tabular-nums; }
 
-    .chip {
-      font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 99px; white-space: nowrap;
-      border: 1px solid var(--border); color: var(--muted);
+    .side { display: flex; align-items: center; gap: 6px; }
+    .side select { padding: 6px 8px; font-size: 13px; border-radius: 8px; background: var(--surface); }
+    .icon {
+      width: 32px; height: 32px; display: inline-grid; place-items: center;
+      border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer;
     }
-    .chip.downloading, .chip.processing { color: var(--accent-2); border-color: rgba(255, 122, 69, .4); }
-    .chip.done { color: var(--ok); border-color: rgba(52, 211, 153, .4); }
-    .chip.error { color: var(--err); border-color: rgba(248, 113, 113, .4); }
-    .chip.held { color: var(--warn); border-color: rgba(251, 191, 36, .4); }
+    .icon:hover { background: var(--sunken); color: var(--ink); }
+    .icon svg { width: 18px; height: 18px; }
+    .gap { width: 8px; }
 
-    .controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-    .controls .spacer { flex: 1; }
+    .empty { padding: 56px 20px; max-width: 520px; }
+    .empty h2 { font: 700 22px/1.2 var(--display); margin: 0 0 8px; letter-spacing: -.01em; }
+    .empty p { margin: 0; color: var(--muted); }
 
-    .bar { height: 6px; background: #1c1f28; border-radius: 99px; overflow: hidden; }
-    .bar > div {
-      height: 100%; width: 0%;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-      transition: width .3s;
+    .notice { padding: 16px 20px 24px; font-size: 12px; color: var(--muted); }
+
+    /* ---------- barra de status ---------- */
+    .status {
+      display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap;
+      padding: 9px 20px; background: var(--surface); border-top: 1px solid var(--line);
+      font-size: 13px; color: var(--muted);
     }
-    .bar.indeterminate > div { width: 40%; animation: slide 1.2s infinite ease-in-out; }
-    @keyframes slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
-    .progress-info { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 6px; }
-
-    .note { font-size: 13px; word-break: break-word; }
-    .note.err { color: var(--err); }
-    .note.ok { color: var(--muted); }
-    .note.ok strong { color: var(--ok); font-weight: 600; }
-
-    footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 28px; line-height: 1.7; }
-    footer a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); }
-    footer a:hover { border-color: var(--accent); }
-    .gh { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; }
-    .gh svg { width: 15px; height: 15px; fill: currentColor; }
-
-    .update {
-      display: none; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
-      padding: 12px 14px; border-radius: 12px; font-size: 14px;
-      background: rgba(52, 211, 153, .08); border: 1px solid rgba(52, 211, 153, .3);
+    .status .counts { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .status label { display: flex; align-items: center; gap: 6px; }
+    .status select { padding: 4px 6px; font-size: 13px; border-radius: 7px; }
+    .status .push { margin-left: auto; }
+    .status a, .linkish {
+      color: var(--muted); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--line);
+      background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
     }
-    .update .txt { flex: 1; min-width: 200px; }
-    .update strong { color: var(--ok); }
-    .update small { display: block; color: var(--muted); margin-top: 2px; }
-    .version { margin-top: 6px; }
-    .version button.link {
-      background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-weight: 400;
-      text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
-    }
-    .version button.link:hover { color: var(--text); opacity: 1; }
+    .status a:hover, .linkish:hover { color: var(--ink); text-decoration-color: currentColor; }
+    .status .gh { display: inline-flex; align-items: center; gap: 5px; }
+    .status .gh svg { width: 14px; height: 14px; fill: currentColor; }
+    #saveDir { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .spinner {
-      display: inline-block; width: 12px; height: 12px; vertical-align: -1px;
-      border: 2px solid rgba(255,255,255,.25); border-top-color: var(--muted);
-      border-radius: 50%; animation: spin .7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    body.dragging .queue { outline: 2px dashed var(--teal); outline-offset: -10px; background: var(--sunken); }
 
-    @media (max-width: 560px) {
-      body { padding: 28px 16px; }
-      .item { grid-template-columns: 1fr; }
-      .thumb { width: 100%; }
-      .add-row #add { width: 100%; }
+    @media (max-width: 680px) {
+      .intake { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; }
+      .entry { flex-wrap: wrap; }
+      .entry > * { flex-shrink: 1; }
+      textarea { flex-basis: 100%; }
+      .entry .btn { flex: 1 1 auto; }
+      .brand { padding-top: 0; }
+      .hint { grid-column: 1; }
+      .row-in { grid-template-columns: 88px minmax(0, 1fr); padding: 12px 16px; gap: 12px; }
+      .thumb { width: 88px; }
+      .side { grid-column: 1 / -1; flex-wrap: wrap; }
+      .status, .strip { padding-left: 16px; padding-right: 16px; }
+      .status .push { margin-left: 0; }
+      #saveDir { max-width: 100%; }
     }
   </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1 class="logo">Downme</h1>
-    <p>Cole um ou vários links do YouTube — eles entram na fila e baixam em sequência.</p>
+  <header class="intake">
+    <h1 class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg>
+      <span>downme</span>
+    </h1>
+    <form class="entry" id="addForm">
+      <textarea id="urls" rows="1" aria-label="Links do YouTube" placeholder="Cole links do YouTube" autocomplete="off" spellcheck="false"></textarea>
+      <div class="toggle" id="defKind" role="group" aria-label="Formato dos próximos links">
+        <button type="button" data-kind="video" aria-pressed="true">Vídeo MP4</button>
+        <button type="button" data-kind="audio" aria-pressed="false">Áudio MP3</button>
+      </div>
+      <select id="defQuality" aria-label="Qualidade dos próximos links">
+        <option value="">Melhor qualidade</option>
+        <option value="2160">Até 2160p</option>
+        <option value="1440">Até 1440p</option>
+        <option value="1080">Até 1080p</option>
+        <option value="720">Até 720p</option>
+        <option value="480">Até 480p</option>
+        <option value="360">Até 360p</option>
+      </select>
+      <button class="btn" id="add" type="submit">Adicionar</button>
+    </form>
+    <div class="hint" id="msg" aria-live="polite">Dica: <kbd>Ctrl</kbd>+<kbd>V</kbd> em qualquer lugar da janela já adiciona, e dá pra arrastar links do navegador pra cá.</div>
   </header>
 
-  <div class="update" id="updateBox">
-    <div class="txt">
-      <strong id="updateTitle"></strong>
-      <small id="updateSub"></small>
-    </div>
-    <button type="button" class="sm" id="restartBtn">Reiniciar agora</button>
-  </div>
+  <div class="strips" id="strips"></div>
 
-  <section class="card">
-    <form id="addForm">
-      <textarea id="urls" rows="2" placeholder="https://www.youtube.com/watch?v=...&#10;(um ou mais links, um por linha)" autocomplete="off" spellcheck="false"></textarea>
-      <div class="add-row">
-        <span class="field-label">Padrão:</span>
-        <div class="seg" id="defKind">
-          <button type="button" data-kind="video" class="active">Vídeo (MP4)</button>
-          <button type="button" data-kind="audio">Só áudio (MP3)</button>
-        </div>
-        <select id="defQuality" aria-label="Qualidade padrão">
-          <option value="">Melhor qualidade</option>
-          <option value="2160">até 2160p (4K)</option>
-          <option value="1440">até 1440p</option>
-          <option value="1080">até 1080p</option>
-          <option value="720">até 720p</option>
-          <option value="480">até 480p</option>
-          <option value="360">até 360p</option>
-        </select>
-        <span class="spacer"></span>
-        <button id="add" type="submit">Adicionar à fila</button>
-      </div>
-    </form>
-    <div class="msg" id="msg"></div>
-  </section>
+  <main class="queue" id="queue">
+    <ol id="list" aria-label="Fila de downloads"></ol>
+    <div class="empty" id="empty" hidden>
+      <h2>Nada na fila</h2>
+      <p>Cole um ou vários links no campo acima. Eles baixam um depois do outro, e cada um pode ter formato e qualidade próprios.</p>
+    </div>
+    <p class="notice">Uso pessoal. Baixe apenas vídeos seus, de domínio público ou com permissão do autor.</p>
+  </main>
 
-  <section class="card">
-    <div class="toolbar">
-      <h2>Fila</h2>
-      <span class="counts" id="counts"></span>
-      <span class="spacer"></span>
-      <label>Simultâneos
-        <select id="concurrency" aria-label="Downloads simultâneos"></select>
-      </label>
-      <button type="button" class="ghost sm" id="pauseBtn">Pausar fila</button>
-      <button type="button" class="ghost sm" id="clearBtn">Limpar concluídos</button>
-    </div>
-    <div class="paused-banner" id="pausedBanner">Fila pausada — o que já está baixando termina, mas nada novo começa.</div>
-    <div id="list"></div>
-  </section>
-
-  <footer>
-    <span id="saveDir"></span>
-    Uso pessoal. Baixe apenas vídeos seus, de domínio público ou com permissão do autor.
-    <div>
-      <a class="gh" href="https://github.com/nobackslash/Downme" target="_blank" rel="noopener">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-        Downme no GitHub · @nobackslash
-      </a>
-    </div>
-    <div class="version" id="versionLine" hidden>
-      <span id="versionText"></span> · <button type="button" class="link" id="checkBtn">Verificar atualizações</button>
-    </div>
+  <footer class="status">
+    <span class="counts"><span class="spin" id="statusSpin" hidden></span><span id="counts">Fila vazia</span></span>
+    <label>Simultâneos <select id="concurrency" aria-label="Downloads simultâneos"></select></label>
+    <button type="button" class="btn quiet small" id="pauseBtn">Pausar fila</button>
+    <button type="button" class="btn quiet small" id="clearBtn">Limpar prontos</button>
+    <span class="push" id="saveDir"></span>
+    <span id="versionLine" hidden><span id="versionText"></span> <button type="button" class="linkish" id="checkBtn">Verificar atualizações</button></span>
+    <a class="gh" href="https://github.com/nobackslash/Downme" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      @nobackslash
+    </a>
   </footer>
-</main>
 
 <script>
   const $ = (id) => document.getElementById(id);
@@ -258,18 +255,31 @@
     kind: "video",
     items: [],
     settings: { concurrency: 1, paused: false },
+    update: null,
     rows: new Map(),       // id -> { el, html }
     order: "",
     seenDone: null,        // ids já prontos (modo site: baixa só os novos)
     timer: null,
   };
-
-  const STATUS_LABEL = {
-    fetching: "Buscando", queued: "Na fila", downloading: "Baixando",
-    processing: "Finalizando", done: "Pronto", error: "Erro", canceled: "Cancelado",
-  };
   const ACTIVE = ["downloading", "processing"];
   const EDITABLE = ["fetching", "queued", "error", "canceled"];
+  const HINT = $("msg").innerHTML;
+
+  const ICONS = {
+    top: '<path d="M5 4h14M12 20V9M7 13l5-5 5 5"/>',
+    up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+    down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+    hold: '<path d="M9 5v14M15 5v14"/>',
+    release: '<path d="M7 5l12 7-12 7z"/>',
+    retry: '<path d="M4 12a8 8 0 1 0 2.5-5.8M4 4v5h5"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="1.5"/>',
+    remove: '<path d="M6 6l12 12M18 6 6 18"/>',
+    open: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    folder: '<path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
+    save: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  };
+  const icon = (act, label, name = act) =>
+    `<button type="button" class="icon" data-act="${act}" title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg></button>`;
 
   // ---------- utilidades ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -283,12 +293,15 @@
   }
   function fmtSpeed(b) {
     if (!b) return "";
-    return b > 1048576 ? (b / 1048576).toFixed(1) + " MB/s" : (b / 1024).toFixed(0) + " KB/s";
+    return b > 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB/s" : (b / 1024).toFixed(0) + " KB/s";
   }
-  function fmtEta(s) { return s ? "falta " + fmtDuration(s) : ""; }
-  function showMsg(text, info = false) {
-    $("msg").textContent = text || "";
-    $("msg").classList.toggle("info", info);
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  let msgTimer = null;
+  function showMsg(text, isError = false) {
+    clearTimeout(msgTimer);
+    $("msg").textContent = text;
+    $("msg").classList.toggle("err", isError);
+    msgTimer = setTimeout(() => { $("msg").innerHTML = HINT; $("msg").classList.remove("err"); }, isError ? 9000 : 5000);
   }
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -302,15 +315,15 @@
     } : undefined;
     const res = await fetch(path, opts);
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "Erro inesperado.");
+    if (!res.ok) throw new Error(data.error || "Algo deu errado. Tente de novo.");
     return data;
   }
 
-  // ---------- padrões de novos itens ----------
+  // ---------- padrões dos próximos links ----------
   function setDefKind(kind) {
     state.kind = kind;
-    [...$("defKind").children].forEach((x) => x.classList.toggle("active", x.dataset.kind === kind));
-    $("defQuality").style.display = kind === "audio" ? "none" : "";
+    [...$("defKind").children].forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.kind === kind)));
+    $("defQuality").hidden = kind === "audio";
     store.set("downme.kind", kind);
   }
   $("defKind").addEventListener("click", (e) => {
@@ -322,32 +335,73 @@
   if (savedQ !== null && [...$("defQuality").options].some((o) => o.value === savedQ)) $("defQuality").value = savedQ;
 
   // ---------- adicionar ----------
-  $("addForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const urls = $("urls").value.split(/\s+/).map((s) => s.trim()).filter(Boolean);
-    if (!urls.length) { showMsg("Cole pelo menos um link."); return; }
-    const btn = $("add");
-    btn.disabled = true;
+  const splitLinks = (text) => text.split(/\s+/).map((s) => s.trim()).filter(Boolean);
+  const looksLikeYoutube = (text) => /(youtube\.com|youtu\.be)\//i.test(text);
+
+  async function addLinks(urls) {
+    if (!urls.length) { showMsg("Cole pelo menos um link.", true); return false; }
+    $("add").disabled = true;
     try {
       const res = await api("/api/queue", {
         urls, kind: state.kind, quality: state.kind === "audio" ? null : ($("defQuality").value || null),
       });
-      const parts = [`${res.added.length} adicionado${res.added.length === 1 ? "" : "s"} à fila.`];
-      if (res.skipped) parts.push(`${res.skipped} já estava${res.skipped === 1 ? "" : "m"} na fila.`);
-      if (res.invalid.length) parts.push(`${res.invalid.length} link${res.invalid.length === 1 ? "" : "s"} inválido${res.invalid.length === 1 ? "" : "s"} ignorado${res.invalid.length === 1 ? "" : "s"}.`);
-      showMsg(parts.join(" "), !res.invalid.length);
+      const parts = [`${plural(res.added.length, "link adicionado", "links adicionados")}.`];
+      if (res.skipped) parts.push(`${plural(res.skipped, "já estava", "já estavam")} na fila.`);
+      if (res.invalid.length) parts.push(`${plural(res.invalid.length, "não é link", "não são links")} do YouTube e ficou no campo.`);
+      showMsg(parts.join(" "), res.invalid.length > 0);
       $("urls").value = res.invalid.join("\n");
+      autoGrow();
       refresh();
+      return true;
     } catch (err) {
-      showMsg(err.message);
+      showMsg(err.message, true);
+      return false;
     } finally {
-      btn.disabled = false;
-      $("urls").focus();
+      $("add").disabled = false;
     }
+  }
+
+  $("addForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    addLinks(splitLinks($("urls").value)).then(() => $("urls").focus());
   });
   // Enter adiciona; Shift+Enter quebra linha.
   $("urls").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("addForm").requestSubmit(); }
+  });
+  function autoGrow() {
+    const t = $("urls");
+    t.style.height = "42px";
+    t.style.height = Math.min(t.scrollHeight + 2, 168) + "px";
+  }
+  $("urls").addEventListener("input", autoGrow);
+
+  // Ctrl+V fora do campo: os links vão direto pra fila.
+  document.addEventListener("paste", (e) => {
+    const target = e.target;
+    if (target.closest && target.closest("textarea, input, select")) return;
+    const text = e.clipboardData?.getData("text") || "";
+    if (!looksLikeYoutube(text)) return;
+    e.preventDefault();
+    addLinks(splitLinks(text));
+  });
+
+  // Arrastar links do navegador para a janela.
+  let dragDepth = 0;
+  document.addEventListener("dragenter", (e) => {
+    if (![...e.dataTransfer.types].some((t) => t === "text/uri-list" || t === "text/plain")) return;
+    dragDepth++; document.body.classList.add("dragging");
+  });
+  document.addEventListener("dragleave", () => {
+    if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("dragging"); }
+  });
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dragDepth = 0; document.body.classList.remove("dragging");
+    const text = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+    const links = splitLinks(text.replace(/^#.*$/gm, ""));
+    if (links.length) addLinks(links);
   });
 
   // ---------- controles da fila ----------
@@ -357,13 +411,12 @@
     applyQueue(api("/api/settings", { concurrency: Number($("concurrency").value) })));
 
   async function applyQueue(promise) {
-    try { render(await promise); } catch (err) { showMsg(err.message); }
+    try { render(await promise); } catch (err) { showMsg(err.message, true); }
   }
 
-  // Ações por item (delegação: os elementos são recriados a cada mudança).
   $("list").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-act]"); if (!b) return;
-    const id = b.closest(".item").dataset.id;
+    const id = b.closest(".row").dataset.id;
     const it = state.items.find((x) => x.id === id); if (!it) return;
     const act = b.dataset.act;
     const base = `/api/queue/${id}`;
@@ -372,12 +425,12 @@
     else if (act === "remove") applyQueue(api(base, undefined, "DELETE"));
     else if (act === "cancel") applyQueue(api(`${base}/cancel`, {}));
     else if (act === "retry") applyQueue(api(`${base}/retry`, {}));
-    else if (act === "file" || act === "folder") api(`/api/open/${id}`, { what: act }).catch((err) => showMsg(err.message));
+    else if (act === "file" || act === "folder") api(`/api/open/${id}`, { what: act }).catch((err) => showMsg(err.message, true));
     else if (act === "save") saveFile(id);
   });
   $("list").addEventListener("change", (e) => {
     const sel = e.target.closest("select[data-field]"); if (!sel) return;
-    const id = sel.closest(".item").dataset.id;
+    const id = sel.closest(".row").dataset.id;
     const value = sel.dataset.field === "quality" ? (sel.value || null) : sel.value;
     applyQueue(api(`/api/queue/${id}`, { [sel.dataset.field]: value }, "PATCH"));
   });
@@ -388,83 +441,76 @@
     document.body.appendChild(a); a.click(); a.remove();
   }
 
-  // ---------- renderização ----------
+  // ---------- linhas ----------
   function qualityOptions(it) {
     // Enquanto busca info, só existe a qualidade escolhida; depois, as do vídeo.
-    const opts = [`<option value="">Melhor</option>`];
     const all = [...new Set([...(it.qualities || []), ...(it.quality ? [it.quality] : [])])].sort((a, b) => b - a);
-    for (const h of all) opts.push(`<option value="${h}"${h === it.quality ? " selected" : ""}>${h}p</option>`);
-    return opts.join("");
+    return [`<option value="">Melhor</option>`]
+      .concat(all.map((h) => `<option value="${h}"${h === it.quality ? " selected" : ""}>${h}p</option>`))
+      .join("");
   }
 
-  function itemHtml(it, pos) {
+  function stateText(it, waiting) {
+    if (it.status === "downloading") {
+      const pct = it.percent ? `${Math.floor(it.percent)}%` : "";
+      return [it.phase === "Baixando" ? "" : it.phase, pct].filter(Boolean).join(" ") || "Baixando";
+    }
+    if (it.status === "processing") return it.phase || "Finalizando";
+    if (it.status === "done") {
+      const ext = (it.saved_name || "").split(".").pop().toUpperCase();
+      return ext ? `Salvo em ${ext}` : "Salvo";
+    }
+    if (it.status === "error") return "Não baixou";
+    if (it.status === "canceled") return "Cancelado";
+    if (it.status === "fetching") return "Lendo o link…";
+    if (waiting && it.hold) return "Segurado";
+    return state.settings.paused ? "Na fila, pausada" : "Na fila";
+  }
+
+  function rowHtml(it) {
     const active = ACTIVE.includes(it.status);
     const editable = EDITABLE.includes(it.status);
     const waiting = it.status === "queued" || it.status === "fetching";
-    const chipCls = it.hold && waiting ? "held" : it.status;
-    const chipText = it.hold && waiting ? "Segurado" : STATUS_LABEL[it.status];
     const title = it.title || it.url;
-    const sub = [it.channel, fmtDuration(it.duration)].filter(Boolean).join(" · ")
-      || (it.status === "fetching" ? '<span class="spinner"></span> buscando informações…' : "");
 
-    let middle = "";
-    if (active) {
-      const indet = it.status === "processing" || !it.percent;
-      const extra = it.status === "downloading"
-        ? [it.percent ? it.percent.toFixed(0) + "%" : "", fmtSpeed(it.speed), fmtEta(it.eta)].filter(Boolean).join(" · ")
-        : "";
-      middle = `
-        <div>
-          <div class="bar${indet ? " indeterminate" : ""}"><div style="width:${indet ? 40 : it.percent}%"></div></div>
-          <div class="progress-info"><span>${esc(it.phase)}</span><span>${esc(extra)}</span></div>
-        </div>`;
-    } else if (it.status === "done") {
-      middle = `<div class="note ok"><strong>Salvo</strong> ${esc(it.saved_name || "")}</div>`;
-    } else if (it.status === "error") {
-      middle = `<div class="note err">${esc(it.error)}</div>`;
+    const spinning = active || it.status === "fetching";
+    const meta = [`<span class="state">${spinning ? '<span class="spin">⠋</span>' : ""}${esc(stateText(it, waiting))}</span>`];
+    if (it.status === "downloading") {
+      if (it.speed) meta.push(`<span class="num">${esc(fmtSpeed(it.speed))}</span>`);
+      if (it.eta) meta.push(`<span class="num">faltam ${esc(fmtDuration(it.eta))}</span>`);
     }
+    if (it.channel) meta.push(`<span>${esc(it.channel)}</span>`);
+    if (it.duration) meta.push(`<span class="num">${esc(fmtDuration(it.duration))}</span>`);
+    if (it.status === "error" && it.error) meta.push(`<span class="why">${esc(it.error)}</span>`);
 
-    const kindSel = `
-      <select data-field="kind" aria-label="Formato"${editable ? "" : " disabled"}>
-        <option value="video"${it.kind === "video" ? " selected" : ""}>MP4</option>
-        <option value="audio"${it.kind === "audio" ? " selected" : ""}>MP3</option>
-      </select>`;
-    const qualSel = it.kind === "video" ? `
-      <select data-field="quality" aria-label="Qualidade"${editable ? "" : " disabled"}>${qualityOptions(it)}</select>` : "";
-
-    let buttons = "";
-    if (editable) {
-      buttons += `
-        <button type="button" class="ghost sm icon" data-act="top" title="Mover para o topo">⤒</button>
-        <button type="button" class="ghost sm icon" data-act="up" title="Subir">↑</button>
-        <button type="button" class="ghost sm icon" data-act="down" title="Descer">↓</button>`;
+    let side = "";
+    if (it.status !== "done") {
+      const dis = editable ? "" : " disabled";
+      side += `<select data-field="kind" aria-label="Formato deste vídeo"${dis}>
+          <option value="video"${it.kind === "video" ? " selected" : ""}>MP4</option>
+          <option value="audio"${it.kind === "audio" ? " selected" : ""}>MP3</option>
+        </select>`;
+      if (it.kind === "video") side += `<select data-field="quality" aria-label="Qualidade deste vídeo"${dis}>${qualityOptions(it)}</select>`;
+      side += `<span class="gap"></span>`;
     }
-    if (waiting) buttons += `<button type="button" class="ghost sm" data-act="hold">${it.hold ? "Liberar" : "Segurar"}</button>`;
-    if (it.status === "error" || it.status === "canceled") buttons += `<button type="button" class="sm" data-act="retry">Tentar de novo</button>`;
-    if (active) buttons += `<button type="button" class="ghost sm" data-act="cancel">Cancelar</button>`;
+    if (editable) side += icon("top", "Mover para o início") + icon("up", "Subir") + icon("down", "Descer");
+    if (waiting) side += it.hold ? icon("hold", "Liberar", "release") : icon("hold", "Segurar");
+    if (it.status === "error" || it.status === "canceled") side += icon("retry", "Tentar de novo");
+    if (active) side += icon("cancel", "Cancelar download", "stop");
     if (it.status === "done") {
-      buttons += state.desktop
-        ? `<button type="button" class="sm" data-act="file">Abrir</button>
-           <button type="button" class="ghost sm" data-act="folder">Mostrar na pasta</button>`
-        : `<button type="button" class="sm" data-act="save">Salvar</button>`;
+      side += state.desktop
+        ? `<button type="button" class="btn small" data-act="file">Abrir</button>` + icon("folder", "Mostrar na pasta")
+        : `<button type="button" class="btn small" data-act="save">Salvar</button>`;
     }
-    const removeTitle = active ? "Cancelar e tirar da fila" : "Tirar da lista";
-    buttons += `<button type="button" class="ghost sm icon" data-act="remove" title="${removeTitle}">✕</button>`;
+    side += icon("remove", active ? "Cancelar e tirar da fila" : "Tirar da lista");
 
     return `
-      ${it.thumbnail ? `<img class="thumb" src="${esc(it.thumbnail)}" alt="">` : `<div class="thumb"></div>`}
-      <div class="body">
-        <div class="head">
-          <span class="pos">${pos}</span>
-          <div class="titles">
-            <p class="title" title="${esc(title)}">${esc(title)}</p>
-            <div class="sub">${sub}</div>
-          </div>
-          <span class="chip ${chipCls}">${esc(chipText)}</span>
-        </div>
-        ${middle}
-        <div class="controls">${it.status === "done" ? "" : kindSel + qualSel}<span class="spacer"></span>${buttons}</div>
-      </div>`;
+      ${it.thumbnail ? `<img class="thumb" src="${esc(it.thumbnail)}" alt="" loading="lazy">` : `<div class="thumb"></div>`}
+      <div class="main">
+        <p class="title" title="${esc(it.saved_name || title)}">${esc(title)}</p>
+        <div class="meta">${meta.join("")}</div>
+      </div>
+      <div class="side">${side}</div>`;
   }
 
   function render(data) {
@@ -478,78 +524,95 @@
       if (!state.seenDone.has(id)) { state.seenDone.add(id); if (!state.desktop) saveFile(id); }
     }
 
-    // barra de ferramentas
-    const c = { wait: 0, run: 0, done: 0, err: 0 };
+    const c = { wait: 0, run: 0, done: 0, bad: 0 };
     for (const it of data.items) {
       if (it.status === "queued" || it.status === "fetching") c.wait++;
       else if (ACTIVE.includes(it.status)) c.run++;
       else if (it.status === "done") c.done++;
-      else c.err++;
+      else c.bad++;
     }
-    $("counts").textContent = [
-      c.run && `${c.run} baixando`, c.wait && `${c.wait} esperando`,
-      c.done && `${c.done} pronto${c.done === 1 ? "" : "s"}`, c.err && `${c.err} com erro/cancelado${c.err === 1 ? "" : "s"}`,
-    ].filter(Boolean).join(" · ");
+    $("counts").textContent = data.items.length ? [
+      c.run && `${c.run} baixando`, c.wait && `${c.wait} na fila`,
+      c.done && plural(c.done, "pronto", "prontos"), c.bad && plural(c.bad, "com problema", "com problema"),
+    ].filter(Boolean).join(", ") : "Fila vazia";
+    $("statusSpin").hidden = !(c.run || (c.wait && !data.settings.paused));
     $("pauseBtn").textContent = data.settings.paused ? "Retomar fila" : "Pausar fila";
-    $("pausedBanner").style.display = data.settings.paused ? "block" : "none";
-    $("clearBtn").disabled = !(c.done || c.err);
+    $("clearBtn").disabled = !(c.done || c.bad);
     if (document.activeElement !== $("concurrency")) $("concurrency").value = String(data.settings.concurrency);
+    renderStrips();
 
-    // lista — só recria a linha que mudou, e nunca a que está com um select em foco
+    // só recria a linha que mudou, e nunca a que está com foco dentro
     const list = $("list");
     const live = new Set();
-    data.items.forEach((it, i) => {
+    for (const it of data.items) {
       live.add(it.id);
-      const html = itemHtml(it, i + 1);
       let row = state.rows.get(it.id);
       if (!row) {
-        const el = document.createElement("div");
-        el.className = "item"; el.dataset.id = it.id;
-        row = { el, html: null };
+        const el = document.createElement("li");
+        el.className = "row"; el.dataset.id = it.id;
+        const layer = document.createElement("pre");
+        layer.className = "braille"; layer.setAttribute("aria-hidden", "true");
+        const inner = document.createElement("div");
+        inner.className = "row-in";
+        el.append(layer, inner);
+        row = { el, layer, inner, html: null, mode: "off", target: 0, shown: 0 };
         state.rows.set(it.id, row);
       }
-      if (row.html !== html && !row.el.contains(document.activeElement)) {
-        row.el.innerHTML = html; row.html = html;
+      const html = rowHtml(it);
+      if (row.html !== html && !row.inner.contains(document.activeElement)) {
+        row.inner.innerHTML = html; row.html = html;
       }
+      const waiting = it.status === "queued" || it.status === "fetching";
+      row.mode = it.status === "downloading" && it.percent ? "progress"
+        : ACTIVE.includes(it.status) ? "wave" : "off";
+      row.target = row.mode === "progress" ? it.percent / 100 : 0;
+      if (row.mode !== "progress") row.shown = 0;
       row.el.classList.toggle("active", ACTIVE.includes(it.status));
-      row.el.classList.toggle("held", it.hold && (it.status === "queued" || it.status === "fetching"));
-    });
+      row.el.classList.toggle("done", it.status === "done");
+      row.el.classList.toggle("error", it.status === "error");
+      row.el.classList.toggle("held", waiting && it.hold);
+    }
     for (const [id, row] of state.rows) {
       if (!live.has(id)) { row.el.remove(); state.rows.delete(id); }
     }
     const orderKey = data.items.map((x) => x.id).join(",");
     if (orderKey !== state.order) {
       state.order = orderKey;
-      data.items.forEach((it) => list.appendChild(state.rows.get(it.id).el));
+      for (const it of data.items) list.appendChild(state.rows.get(it.id).el);
     }
-    let empty = list.querySelector(".empty");
-    if (!data.items.length && !empty) {
-      empty = document.createElement("div");
-      empty.className = "empty";
-      empty.textContent = "A fila está vazia. Cole links acima para começar.";
-      list.appendChild(empty);
-    } else if (data.items.length && empty) {
-      empty.remove();
-    }
+    $("empty").hidden = data.items.length > 0;
   }
 
-  // ---------- atualização automática (só no app) ----------
-  function renderUpdate(u) {
-    const ready = u.status === "ready";
-    $("updateBox").style.display = ready ? "flex" : "none";
-    if (ready) {
+  // ---------- faixas: pausa e atualização ----------
+  function renderStrips() {
+    const parts = [];
+    const u = state.update;
+    if (u && u.status === "ready") {
       const busy = state.items.some((x) => ACTIVE.includes(x.status));
-      $("updateTitle").textContent = `Downme ${u.latest} já foi baixado.`;
-      $("updateSub").textContent = busy
-        ? "Instala sozinho quando você fechar o app. Se reiniciar agora, os downloads em andamento recomeçam do zero."
-        : "Instala sozinho quando você fechar o app — ou reinicie agora.";
+      parts.push(`<div class="strip update"><p>A versão ${esc(u.latest)} já foi baixada e é instalada quando você fechar o app.${busy ? " Reiniciando agora, os downloads em andamento recomeçam do zero." : ""}</p><button type="button" class="btn small" id="restartBtn">Reiniciar agora</button></div>`);
     }
+    if (state.settings.paused) {
+      parts.push(`<div class="strip paused"><p>Fila pausada. O que já está baixando termina, mas nada novo começa.</p></div>`);
+    }
+    const html = parts.join("");
+    if ($("strips").dataset.html !== html) { $("strips").innerHTML = html; $("strips").dataset.html = html; }
+  }
+  $("strips").addEventListener("click", async (e) => {
+    const b = e.target.closest("#restartBtn"); if (!b) return;
+    b.disabled = true; b.textContent = "Reiniciando…";
+    try { await api("/api/update/restart", {}); }
+    catch (err) { showMsg(err.message, true); b.disabled = false; b.textContent = "Reiniciar agora"; }
+  });
+
+  function renderUpdate(u) {
+    state.update = u;
     const status = {
-      checking: "procurando…", downloading: `baixando atualização ${u.percent || 0}%`,
-      latest: "você está na versão mais recente", error: u.error, ready: "atualização pronta",
+      checking: "procurando atualização…", downloading: `baixando atualização, ${u.percent || 0}%`,
+      latest: "atualizado", error: u.error, ready: "atualização pronta",
     }[u.status];
-    $("versionText").textContent = `Downme ${u.current}` + (status ? ` — ${status}` : "");
-    $("checkBtn").disabled = ["checking", "downloading", "ready"].includes(u.status);
+    $("versionText").textContent = `Versão ${u.current}` + (status ? `, ${status}.` : ".");
+    $("checkBtn").hidden = ["checking", "downloading", "ready"].includes(u.status);
+    renderStrips();
   }
   async function pollUpdate() {
     try { renderUpdate(await api("/api/update")); } catch {}
@@ -558,12 +621,77 @@
     try { renderUpdate(await api("/api/update/check", {})); } catch {}
     setTimeout(pollUpdate, 800);
   });
-  $("restartBtn").addEventListener("click", async () => {
-    $("restartBtn").disabled = true;
-    $("restartBtn").textContent = "Reiniciando…";
-    try { await api("/api/update/restart", {}); }
-    catch (err) { showMsg(err.message); $("restartBtn").disabled = false; $("restartBtn").textContent = "Reiniciar agora"; }
-  });
+
+  // ---------- braille: campo de progresso e spinners ----------
+  // Cada caractere braille (U+2800 + 8 bits) é uma grade de 2x4 pontos;
+  // sortear os pontos com uma densidade d dá o "chuvisco" que cintila.
+  const SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+  const BLANK = "⠀";  // braille vazio: mesma largura dos outros, mantém a borda alinhada
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let cell = { w: 7.5, h: 14 };
+  const NL = String.fromCharCode(10);
+  let frame = 0;
+
+  function measureCell() {
+    const probe = document.createElement("pre");
+    probe.className = "braille";
+    probe.style.cssText = "position:absolute;visibility:hidden;inset:auto;left:-9999px;width:auto";
+    probe.textContent = "⣿".repeat(50);
+    document.body.appendChild(probe);
+    const w = probe.getBoundingClientRect().width / 50;
+    probe.remove();
+    if (w > 2) cell = { w, h: 14 };
+  }
+
+  function dots(d) {
+    let bits = 0;
+    for (let i = 0; i < 8; i++) if (Math.random() < d) bits |= 1 << i;
+    return bits ? String.fromCharCode(0x2800 + bits) : BLANK;
+  }
+
+  function drawBraille(row) {
+    const cols = Math.ceil(row.el.clientWidth / cell.w) + 1;
+    const lines = Math.ceil(row.el.clientHeight / cell.h);
+    let out = "";
+    if (row.mode === "progress") {
+      // anda suave até a porcentagem real; a borda da frente se desfaz em pontos soltos
+      row.shown += (row.target - row.shown) * (calm ? 1 : 0.2);
+      const edge = row.shown * cols;
+      for (let y = 0; y < lines; y++) {
+        for (let x = 0; x < cols; x++) {
+          const dist = edge - x;
+          const d = dist > 6 ? 0.82 : dist > 0 ? 0.18 + dist * 0.1 : dist > -4 ? 0.06 : 0;
+          out += d ? dots(d) : BLANK;
+        }
+        out += NL;
+      }
+    } else {
+      // sem porcentagem (início, juntar vídeo e áudio, converter MP3): uma onda corre pela linha
+      const span = Math.max(24, cols * 0.22);
+      for (let y = 0; y < lines; y++) {
+        for (let x = 0; x < cols; x++) {
+          const wave = Math.sin((x + y * 1.5 - frame * 1.1) / span * Math.PI);
+          const d = wave > 0 ? Math.pow(wave, 3) * 0.8 : 0;
+          out += d > 0.03 ? dots(d) : BLANK;
+        }
+        out += NL;
+      }
+    }
+    row.layer.textContent = out;
+  }
+
+  function tick() {
+    frame++;
+    const glyph = SPIN[frame % SPIN.length];
+    document.querySelectorAll(".spin").forEach((el) => { el.textContent = glyph; });
+    for (const row of state.rows.values()) {
+      if (row.mode !== "off") drawBraille(row);
+      else if (row.layer.textContent) row.layer.textContent = "";
+    }
+  }
+  setInterval(tick, calm ? 1000 : 90);
+  measureCell();
+  if (document.fonts) document.fonts.ready.then(measureCell);
 
   // ---------- polling ----------
   async function refresh() {
@@ -575,7 +703,10 @@
 
   fetch("/api/config").then((r) => r.json()).then((cfg) => {
     state.desktop = !!cfg.desktop;
-    if (cfg.save_dir) $("saveDir").innerHTML = `Arquivos salvos em <b>${esc(cfg.save_dir)}</b><br>`;
+    if (cfg.save_dir) {
+      $("saveDir").textContent = `Salvando em ${cfg.save_dir}`;
+      $("saveDir").title = cfg.save_dir;
+    }
     const sel = $("concurrency");
     for (let n = 1; n <= (cfg.max_concurrency || 4); n++) sel.add(new Option(String(n), String(n)));
     sel.value = String(state.settings.concurrency);

@@ -1,0 +1,66 @@
+"""Downme como app desktop (vira Downme.exe com o PyInstaller).
+
+Sobe o backend Flask numa porta livre só da sua máquina e abre a mesma
+interface numa janela nativa (WebView2 do Windows) — sem navegador.
+Os arquivos vão para Downloads\\Downme.
+"""
+
+import faulthandler
+import logging
+import os
+import sys
+import tempfile
+import threading
+from pathlib import Path
+
+# Log em %LOCALAPPDATA%\Downme\downme.log — num .exe sem console é o único
+# jeito de ver erros (stdout/stderr são None e quebrariam o Flask/yt-dlp).
+LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()) / "Downme"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "downme.log"
+_log_stream = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
+if sys.stdout is None:
+    sys.stdout = _log_stream
+if sys.stderr is None:
+    sys.stderr = _log_stream
+faulthandler.enable(file=_log_stream)
+logging.basicConfig(
+    stream=_log_stream, level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+log = logging.getLogger("downme")
+sys.excepthook = lambda t, v, tb: log.critical("erro não tratado", exc_info=(t, v, tb))
+threading.excepthook = lambda a: log.critical(
+    "erro em thread", exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
+
+import webview  # noqa: E402
+from werkzeug.serving import make_server  # noqa: E402
+
+import app as backend  # noqa: E402
+
+
+def main() -> None:
+    log.info("iniciando (frozen=%s, ffmpeg=%s, js=%s)",
+             backend.FROZEN, backend.FFMPEG, backend.BASE_OPTS["js_runtimes"])
+    backend.configure(desktop=True)
+
+    # Porta 0 = o sistema escolhe uma livre; escuta só em 127.0.0.1.
+    server = make_server("127.0.0.1", 0, backend.app, threaded=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+    webview.create_window(
+        "Downme",
+        f"http://127.0.0.1:{server.server_port}/",
+        width=720,
+        height=800,
+        min_size=(420, 620),
+        background_color="#0e0f13",
+    )
+    log.info("servidor em 127.0.0.1:%s", server.server_port)
+    webview.start()
+    log.info("janela fechada, encerrando")
+    server.shutdown()
+
+
+if __name__ == "__main__":
+    main()

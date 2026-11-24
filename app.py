@@ -4,14 +4,24 @@ Backend Flask + yt-dlp, usado de dois jeitos:
   * site local:  `python app.py` -> abre em http://127.0.0.1:5000
   * app desktop: `desktop.py` (vira Downme.exe) chama configure(desktop=True)
 
-Fluxo da API:
-  1. POST /api/info      -> metadados + qualidades disponíveis
-  2. POST /api/download  -> inicia um job em segundo plano, devolve job_id
-  3. GET  /api/progress/<job_id> -> status/porcentagem
-  4. GET  /api/file/<job_id>     -> entrega o arquivo (modo site)
-     POST /api/open/<job_id>     -> abre arquivo/pasta (modo app)
+Tudo passa por uma fila de downloads. Cada item tem formato e qualidade
+próprios (editáveis enquanto espera), pode ser reordenado, segurado,
+cancelado ou refeito. No app desktop a fila pendente sobrevive ao fechar.
+
+API:
+  GET    /api/queue                  -> itens + configurações da fila
+  POST   /api/queue                  -> adiciona links {urls, kind, quality}
+  PATCH  /api/queue/<id>             -> edita {kind, quality, hold}
+  DELETE /api/queue/<id>             -> remove (cancela se estiver baixando)
+  POST   /api/queue/<id>/move        -> {dir: up|down|top}
+  POST   /api/queue/<id>/retry       -> recoloca erro/cancelado na fila
+  POST   /api/queue/clear            -> tira concluídos/erros da lista
+  POST   /api/settings               -> {concurrency, paused}
+  GET    /api/file/<id>              -> entrega o arquivo (modo site)
+  POST   /api/open/<id>              -> abre arquivo/pasta (modo app)
 """
 
+import json
 import os
 import shutil
 import subprocess
@@ -39,15 +49,19 @@ ALLOWED_HOSTS = {
 CONFIG = {
     "desktop": False,
     "work_dir": BUNDLE_DIR / "downloads",
-    "save_dir": None,  # modo app: pasta final dos arquivos
+    "save_dir": None,    # modo app: pasta final dos arquivos
+    "state_file": None,  # modo app: onde a fila pendente é salva
 }
 
 
-def configure(desktop: bool = False, save_dir: Path | None = None) -> None:
+def configure(desktop: bool = False, save_dir: Path | None = None,
+              state_file: Path | None = None) -> None:
     CONFIG["desktop"] = desktop
     if desktop:
         CONFIG["work_dir"] = Path(tempfile.gettempdir()) / "downme"
         CONFIG["save_dir"] = Path(save_dir or Path.home() / "Downloads" / "Downme")
+        CONFIG["state_file"] = Path(state_file) if state_file else None
+        load_state()
 
 
 # ---------- binários externos (ffmpeg e runtime JS) ----------
@@ -85,6 +99,7 @@ NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 BASE_OPTS = {
     "quiet": True,
     "no_warnings": True,
+    "noprogress": True,  # o progresso vem pelos hooks; não suja o log
     "noplaylist": True,
     "js_runtimes": js_runtimes(),
 }
@@ -92,8 +107,26 @@ if FFMPEG:
     BASE_OPTS["ffmpeg_location"] = FFMPEG
 
 app = Flask(__name__, static_folder=str(BUNDLE_DIR / "static"))
-jobs: dict[str, dict] = {}
-jobs_lock = threading.Lock()
+
+# ---------- estado da fila ----------
+# Tudo protegido por `lock`. `order` define a posição de cada item na fila.
+lock = threading.RLock()
+items: dict[str, dict] = {}
+order: list[str] = []
+SETTINGS = {"concurrency": 1, "paused": False}
+MAX_CONCURRENCY = 4
+MAX_URLS_PER_ADD = 200
+
+ACTIVE = ("downloading", "processing")
+FINISHED = ("done", "error", "canceled")
+# Campos internos que não vão para o navegador.
+PRIVATE = ("file", "cancel", "created")
+# Limita quantas buscas de metadados rodam ao mesmo tempo (colar 50 links).
+info_slots = threading.Semaphore(3)
+
+
+class Canceled(Exception):
+    pass
 
 
 # ---------- utilidades ----------
@@ -104,25 +137,6 @@ def valid_youtube_url(url: str) -> bool:
     except ValueError:
         return False
     return parsed.scheme in ("http", "https") and parsed.hostname in ALLOWED_HOSTS
-
-
-def cleanup_old_jobs() -> None:
-    now = time.time()
-    with jobs_lock:
-        expired = [jid for jid, j in jobs.items() if now - j["created"] > JOB_TTL_SECONDS]
-        for jid in expired:
-            jobs.pop(jid, None)
-    work = CONFIG["work_dir"]
-    if work.exists():
-        for folder in work.iterdir():
-            if folder.is_dir() and now - folder.stat().st_mtime > JOB_TTL_SECONDS:
-                shutil.rmtree(folder, ignore_errors=True)
-
-
-def update_job(job_id: str, **fields) -> None:
-    with jobs_lock:
-        if job_id in jobs:
-            jobs[job_id].update(fields)
 
 
 def unique_path(folder: Path, name: str) -> Path:
@@ -166,82 +180,182 @@ def to_mp3(src: Path, title: str | None, artist: str | None) -> Path:
     return dst
 
 
-# ---------- rotas ----------
-
-@app.get("/")
-def index():
-    return send_from_directory(app.static_folder, "index.html")
 
 
-@app.get("/api/config")
-def config():
-    save = CONFIG["save_dir"]
-    return jsonify(desktop=CONFIG["desktop"], save_dir=str(save) if save else None)
+# ---------- fila ----------
+
+def public(item: dict) -> dict:
+    return {k: v for k, v in item.items() if k not in PRIVATE}
 
 
-@app.post("/api/info")
-def info():
-    url = (request.get_json(silent=True) or {}).get("url", "").strip()
-    if not valid_youtube_url(url):
-        return jsonify(error="Cole um link válido do YouTube."), 400
+def new_item(url: str, kind: str, quality: int | None) -> dict:
+    return {
+        "id": uuid.uuid4().hex, "url": url, "kind": kind, "quality": quality,
+        "hold": False, "status": "fetching", "phase": "Buscando informações",
+        "percent": 0, "speed": None, "eta": None, "error": None,
+        "title": None, "channel": None, "duration": None, "thumbnail": None,
+        "qualities": None, "saved_name": None,
+        "file": None, "cancel": False, "created": time.time(),
+    }
 
+
+def persist() -> None:
+    """Modo app: grava a fila pendente para retomar na próxima abertura."""
+    path = CONFIG["state_file"]
+    if not path:
+        return
+    with lock:
+        pending = []
+        for iid in order:
+            it = items[iid]
+            if it["status"] in FINISHED:
+                continue
+            keep = {k: it[k] for k in ("id", "url", "kind", "quality", "hold", "title",
+                                         "channel", "duration", "thumbnail", "qualities")}
+            pending.append(keep)
+        data = {"settings": SETTINGS, "items": pending}
     try:
-        with yt_dlp.YoutubeDL({**BASE_OPTS, "skip_download": True}) as ydl:
-            data = ydl.extract_info(url, download=False)
-    except Exception as exc:  # noqa: BLE001
-        app.logger.warning("info falhou: %s", exc)
-        return jsonify(error=friendly_error(exc)), 422
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError as exc:
+        app.logger.warning("não consegui salvar a fila: %s", exc)
+
+
+def load_state() -> None:
+    path = CONFIG["state_file"]
+    if not path or not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        app.logger.warning("fila salva ilegível, ignorando: %s", exc)
+        return
+    s = data.get("settings") or {}
+    SETTINGS["concurrency"] = clamp_concurrency(s.get("concurrency", 1))
+    SETTINGS["paused"] = bool(s.get("paused", False))
+    to_fetch = []
+    with lock:
+        for saved in data.get("items") or []:
+            url = saved.get("url", "")
+            if not valid_youtube_url(url) or saved.get("kind") not in ("video", "audio"):
+                continue
+            it = new_item(url, saved["kind"], saved.get("quality"))
+            for k in ("id", "hold", "title", "channel", "duration", "thumbnail", "qualities"):
+                if saved.get(k) is not None:
+                    it[k] = saved[k]
+            if it["qualities"] is not None:
+                it.update(status="queued", phase="Na fila")
+            else:
+                to_fetch.append(it["id"])
+            items[it["id"]] = it
+            order.append(it["id"])
+    for iid in to_fetch:
+        threading.Thread(target=fetch_info, args=(iid,), daemon=True).start()
+    schedule()
+
+
+def clamp_concurrency(value) -> int:
+    try:
+        return max(1, min(MAX_CONCURRENCY, int(value)))
+    except (TypeError, ValueError):
+        return 1
+
+
+def parse_quality(value) -> int | None:
+    """None = melhor disponível. Levanta ValueError se for lixo."""
+    if value in (None, "", "best"):
+        return None
+    q = int(value)
+    if not 100 <= q <= 10000:
+        raise ValueError(q)
+    return q
+
+
+def fit_quality(wanted: int | None, available: list[int]) -> int | None:
+    """Ajusta a qualidade pedida ao que o vídeo tem (maior <= pedida)."""
+    if wanted is None or not available or wanted in available:
+        return wanted
+    lower = [h for h in available if h <= wanted]
+    return max(lower) if lower else min(available)
+
+
+def schedule() -> None:
+    """Inicia downloads enquanto houver vaga, respeitando ordem, pausa e itens segurados."""
+    with lock:
+        if SETTINGS["paused"]:
+            return
+        running = sum(1 for it in items.values() if it["status"] in ACTIVE)
+        for iid in order:
+            if running >= SETTINGS["concurrency"]:
+                break
+            it = items[iid]
+            if it["status"] == "queued" and not it["hold"]:
+                it.update(status="downloading", phase="Iniciando", percent=0,
+                          speed=None, eta=None, cancel=False)
+                running += 1
+                threading.Thread(target=run_download, args=(iid,), daemon=True).start()
+
+
+def update_item(item_id: str, **fields) -> None:
+    with lock:
+        if item_id in items:
+            items[item_id].update(fields)
+
+
+def fetch_info(item_id: str) -> None:
+    with info_slots:
+        with lock:
+            it = items.get(item_id)
+            if not it or it["status"] != "fetching":
+                return
+            url = it["url"]
+        try:
+            with yt_dlp.YoutubeDL({**BASE_OPTS, "skip_download": True}) as ydl:
+                data = ydl.extract_info(url, download=False)
+        except Exception as exc:  # noqa: BLE001
+            app.logger.warning("info falhou: %s", exc)
+            update_item(item_id, status="error", phase="Erro", error=friendly_error(exc))
+            persist()
+            return
 
     heights = sorted(
         {f["height"] for f in data.get("formats", [])
-         if f.get("height") and f.get("vcodec") not in (None, "none")},
+         if f.get("height") and f.get("vcodec") not in (None, "none") and f["height"] >= 144},
         reverse=True,
     )
-
-    return jsonify(
-        title=data.get("title"),
-        channel=data.get("uploader") or data.get("channel"),
-        duration=data.get("duration"),
-        thumbnail=data.get("thumbnail"),
-        qualities=[h for h in heights if h >= 144],
-    )
-
-
-@app.post("/api/download")
-def download():
-    cleanup_old_jobs()
-    body = request.get_json(silent=True) or {}
-    url = body.get("url", "").strip()
-    kind = body.get("kind", "video")
-    quality = body.get("quality")
-
-    if not valid_youtube_url(url):
-        return jsonify(error="Cole um link válido do YouTube."), 400
-    if kind not in ("video", "audio"):
-        return jsonify(error="Tipo inválido."), 400
-    try:
-        quality = int(quality) if quality is not None else None
-    except (TypeError, ValueError):
-        return jsonify(error="Qualidade inválida."), 400
-
-    job_id = uuid.uuid4().hex
-    with jobs_lock:
-        jobs[job_id] = {
-            "status": "queued", "percent": 0, "phase": "Na fila",
-            "file": None, "saved_name": None, "error": None, "created": time.time(),
-        }
-
-    threading.Thread(
-        target=run_download, args=(job_id, url, kind, quality), daemon=True
-    ).start()
-    return jsonify(job_id=job_id)
+    with lock:
+        it = items.get(item_id)
+        if not it or it["status"] != "fetching":
+            return
+        it.update(
+            title=data.get("title"),
+            channel=data.get("uploader") or data.get("channel"),
+            duration=data.get("duration"),
+            thumbnail=data.get("thumbnail"),
+            qualities=heights,
+            quality=fit_quality(it["quality"], heights),
+            status="queued", phase="Na fila",
+        )
+    persist()
+    schedule()
 
 
-def run_download(job_id: str, url: str, kind: str, quality: int | None) -> None:
-    out_dir = CONFIG["work_dir"] / job_id
+def run_download(item_id: str) -> None:
+    with lock:
+        it = items[item_id]
+        url, kind, quality = it["url"], it["kind"], it["quality"]
+    out_dir = CONFIG["work_dir"] / item_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    def canceled() -> bool:
+        with lock:
+            return items.get(item_id, {}).get("cancel", True)
+
     def progress_hook(d):
+        if canceled():
+            raise Canceled()
         if d["status"] == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             done = d.get("downloaded_bytes") or 0
@@ -249,14 +363,15 @@ def run_download(job_id: str, url: str, kind: str, quality: int | None) -> None:
             fmt = d.get("info_dict", {})
             is_audio_only = fmt.get("vcodec") in (None, "none")
             phase = "Baixando áudio" if is_audio_only and kind == "video" else "Baixando"
-            update_job(job_id, status="downloading", percent=pct, phase=phase,
-                       speed=d.get("speed"), eta=d.get("eta"))
+            update_item(item_id, status="downloading", percent=pct, phase=phase,
+                        speed=d.get("speed"), eta=d.get("eta"))
         elif d["status"] == "finished":
-            update_job(job_id, percent=100)
+            update_item(item_id, percent=100)
 
     def postprocessor_hook(d):
         if d["status"] == "started":
-            update_job(job_id, status="processing", phase="Finalizando arquivo")
+            update_item(item_id, status="processing", phase="Finalizando arquivo",
+                        speed=None, eta=None)
 
     opts = {
         **BASE_OPTS,
@@ -279,6 +394,8 @@ def run_download(job_id: str, url: str, kind: str, quality: int | None) -> None:
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             data = ydl.extract_info(url, download=True)
+        if canceled():
+            raise Canceled()
         files = [p for p in out_dir.iterdir()
                  if p.is_file() and not p.name.endswith((".part", ".ytdl"))]
         if not files:
@@ -286,8 +403,10 @@ def run_download(job_id: str, url: str, kind: str, quality: int | None) -> None:
         final = max(files, key=lambda p: p.stat().st_size)
 
         if kind == "audio":
-            update_job(job_id, status="processing", phase="Convertendo para MP3")
+            update_item(item_id, status="processing", phase="Convertendo para MP3")
             final = to_mp3(final, data.get("title"), data.get("uploader"))
+        if canceled():
+            raise Canceled()
 
         if CONFIG["desktop"]:
             save_dir = CONFIG["save_dir"]
@@ -297,45 +416,261 @@ def run_download(job_id: str, url: str, kind: str, quality: int | None) -> None:
             shutil.rmtree(out_dir, ignore_errors=True)
             final = target
 
-        update_job(job_id, status="done", percent=100, phase="Pronto",
-                   file=str(final), saved_name=final.name)
+        update_item(item_id, status="done", percent=100, phase="Pronto",
+                    speed=None, eta=None, file=str(final), saved_name=final.name,
+                    finished=time.time())
     except Exception as exc:  # noqa: BLE001
-        app.logger.warning("download falhou: %s", exc)
-        update_job(job_id, status="error", error=friendly_error(exc))
         shutil.rmtree(out_dir, ignore_errors=True)
+        if canceled():
+            update_item(item_id, status="canceled", phase="Cancelado",
+                        speed=None, eta=None, percent=0)
+        else:
+            app.logger.warning("download falhou: %s", exc)
+            update_item(item_id, status="error", phase="Erro", error=friendly_error(exc),
+                        speed=None, eta=None)
+    finally:
+        with lock:
+            it = items.get(item_id)
+            if it and it.get("remove"):
+                items.pop(item_id, None)
+                if item_id in order:
+                    order.remove(item_id)
+        persist()
+        schedule()
 
 
-@app.get("/api/progress/<job_id>")
-def progress(job_id):
-    with jobs_lock:
-        job = jobs.get(job_id)
-        if not job:
-            return jsonify(error="Job não encontrado."), 404
-        return jsonify({k: v for k, v in job.items() if k not in ("file", "created")})
+def cleanup_old() -> None:
+    """Modo site: arquivos temporários (e seus itens) expiram em 1h."""
+    if CONFIG["desktop"]:
+        return
+    now = time.time()
+    with lock:
+        expired = [iid for iid, it in items.items()
+                   if it["status"] == "done" and now - it.get("finished", now) > JOB_TTL_SECONDS]
+        for iid in expired:
+            items.pop(iid, None)
+            order.remove(iid)
+        busy = {iid for iid, it in items.items() if it["status"] in ACTIVE}
+    work = CONFIG["work_dir"]
+    if work.exists():
+        for folder in work.iterdir():
+            if (folder.is_dir() and folder.name not in busy
+                    and now - folder.stat().st_mtime > JOB_TTL_SECONDS):
+                shutil.rmtree(folder, ignore_errors=True)
 
 
-@app.get("/api/file/<job_id>")
-def get_file(job_id):
-    with jobs_lock:
-        job = jobs.get(job_id)
-    if not job or job["status"] != "done" or not job["file"]:
+def get_item_or_404(item_id: str):
+    it = items.get(item_id)
+    if not it:
+        return None, (jsonify(error="Item não encontrado."), 404)
+    return it, None
+
+
+def queue_snapshot():
+    with lock:
+        return jsonify(items=[public(items[iid]) for iid in order], settings=SETTINGS)
+
+
+# ---------- rotas ----------
+
+@app.get("/")
+def index():
+    return send_from_directory(app.static_folder, "index.html")
+
+
+@app.get("/api/config")
+def config():
+    save = CONFIG["save_dir"]
+    return jsonify(desktop=CONFIG["desktop"], save_dir=str(save) if save else None,
+                   max_concurrency=MAX_CONCURRENCY)
+
+
+@app.get("/api/queue")
+def list_queue():
+    return queue_snapshot()
+
+
+@app.post("/api/queue")
+def add_to_queue():
+    cleanup_old()
+    body = request.get_json(silent=True) or {}
+    urls = body.get("urls")
+    if isinstance(urls, str):
+        urls = urls.split()
+    if not isinstance(urls, list):
+        return jsonify(error="Mande uma lista de links."), 400
+    kind = body.get("kind", "video")
+    if kind not in ("video", "audio"):
+        return jsonify(error="Tipo inválido."), 400
+    try:
+        quality = parse_quality(body.get("quality"))
+    except (TypeError, ValueError):
+        return jsonify(error="Qualidade inválida."), 400
+
+    cleaned, invalid, seen = [], [], set()
+    for raw in urls[:MAX_URLS_PER_ADD]:
+        url = str(raw).strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        (cleaned if valid_youtube_url(url) else invalid).append(url)
+    if not cleaned:
+        return jsonify(error="Nenhum link válido do YouTube.", invalid=invalid), 400
+
+    added, skipped = [], 0
+    with lock:
+        pending = {(it["url"], it["kind"]) for it in items.values()
+                   if it["status"] not in FINISHED}
+        for url in cleaned:
+            if (url, kind) in pending:
+                skipped += 1
+                continue
+            it = new_item(url, kind, quality)
+            items[it["id"]] = it
+            order.append(it["id"])
+            added.append(it["id"])
+    for iid in added:
+        threading.Thread(target=fetch_info, args=(iid,), daemon=True).start()
+    persist()
+    return jsonify(added=added, invalid=invalid, skipped=skipped)
+
+
+@app.patch("/api/queue/<item_id>")
+def edit_item(item_id):
+    body = request.get_json(silent=True) or {}
+    with lock:
+        it, err = get_item_or_404(item_id)
+        if err:
+            return err
+        if it["status"] in ACTIVE or it["status"] == "done":
+            return jsonify(error="Esse item já começou — não dá mais pra mudar."), 409
+        if "kind" in body:
+            if body["kind"] not in ("video", "audio"):
+                return jsonify(error="Tipo inválido."), 400
+            it["kind"] = body["kind"]
+        if "quality" in body:
+            try:
+                it["quality"] = parse_quality(body["quality"])
+            except (TypeError, ValueError):
+                return jsonify(error="Qualidade inválida."), 400
+        if "hold" in body:
+            it["hold"] = bool(body["hold"])
+    persist()
+    schedule()
+    return queue_snapshot()
+
+
+@app.delete("/api/queue/<item_id>")
+def remove_item(item_id):
+    with lock:
+        it, err = get_item_or_404(item_id)
+        if err:
+            return err
+        if it["status"] in ACTIVE:
+            # O worker termina, limpa os temporários e tira o item da lista.
+            it.update(cancel=True, remove=True, phase="Cancelando")
+        else:
+            items.pop(item_id)
+            order.remove(item_id)
+    persist()
+    return queue_snapshot()
+
+
+@app.post("/api/queue/<item_id>/cancel")
+def cancel_item(item_id):
+    with lock:
+        it, err = get_item_or_404(item_id)
+        if err:
+            return err
+        if it["status"] in ACTIVE:
+            it.update(cancel=True, phase="Cancelando")
+    return queue_snapshot()
+
+
+@app.post("/api/queue/<item_id>/move")
+def move_item(item_id):
+    direction = (request.get_json(silent=True) or {}).get("dir")
+    with lock:
+        if item_id not in items:
+            return jsonify(error="Item não encontrado."), 404
+        i = order.index(item_id)
+        if direction == "up" and i > 0:
+            order[i - 1], order[i] = order[i], order[i - 1]
+        elif direction == "down" and i < len(order) - 1:
+            order[i + 1], order[i] = order[i], order[i + 1]
+        elif direction == "top":
+            order.insert(0, order.pop(i))
+        elif direction not in ("up", "down", "top"):
+            return jsonify(error="Direção inválida."), 400
+    persist()
+    schedule()
+    return queue_snapshot()
+
+
+@app.post("/api/queue/<item_id>/retry")
+def retry_item(item_id):
+    with lock:
+        it, err = get_item_or_404(item_id)
+        if err:
+            return err
+        if it["status"] not in ("error", "canceled"):
+            return jsonify(error="Só dá pra refazer itens com erro ou cancelados."), 409
+        fetch = it["qualities"] is None
+        it.update(status="fetching" if fetch else "queued",
+                  phase="Buscando informações" if fetch else "Na fila",
+                  error=None, percent=0, cancel=False)
+    if fetch:
+        threading.Thread(target=fetch_info, args=(item_id,), daemon=True).start()
+    persist()
+    schedule()
+    return queue_snapshot()
+
+
+@app.post("/api/queue/clear")
+def clear_finished():
+    with lock:
+        for iid in [i for i in order if items[i]["status"] in FINISHED]:
+            items.pop(iid)
+            order.remove(iid)
+    persist()
+    return queue_snapshot()
+
+
+@app.post("/api/settings")
+def update_settings():
+    body = request.get_json(silent=True) or {}
+    with lock:
+        if "concurrency" in body:
+            SETTINGS["concurrency"] = clamp_concurrency(body["concurrency"])
+        if "paused" in body:
+            SETTINGS["paused"] = bool(body["paused"])
+    persist()
+    schedule()
+    return queue_snapshot()
+
+
+@app.get("/api/file/<item_id>")
+def get_file(item_id):
+    with lock:
+        it = items.get(item_id)
+        path = Path(it["file"]) if it and it["status"] == "done" and it["file"] else None
+    if not path:
         return jsonify(error="Arquivo não disponível."), 404
-    path = Path(job["file"])
     if not path.exists():
         return jsonify(error="Arquivo expirou."), 410
     return send_file(path, as_attachment=True, download_name=path.name)
 
 
-@app.post("/api/open/<job_id>")
-def open_result(job_id):
+@app.post("/api/open/<item_id>")
+def open_result(item_id):
     """Modo app: abre o arquivo baixado ou mostra ele no Explorer."""
     if not CONFIG["desktop"]:
         return jsonify(error="Só disponível no app."), 404
-    with jobs_lock:
-        job = jobs.get(job_id)
-    if not job or not job.get("file"):
+    with lock:
+        it = items.get(item_id)
+        path = Path(it["file"]) if it and it.get("file") else None
+    if not path:
         return jsonify(error="Arquivo não disponível."), 404
-    path = Path(job["file"])
     if not path.exists():
         return jsonify(error="O arquivo foi movido ou apagado."), 410
 

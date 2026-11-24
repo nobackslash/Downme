@@ -2,7 +2,8 @@
 
 Sobe o backend Flask numa porta livre só da sua máquina e abre a mesma
 interface numa janela nativa (WebView2 do Windows) — sem navegador.
-Os arquivos vão para Downloads\\Downme.
+Os arquivos vão para Downloads\\Downme. A fila pendente fica salva em
+%LOCALAPPDATA%\\Downme\\queue.json e é retomada na próxima abertura.
 """
 
 import faulthandler
@@ -29,6 +30,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 log = logging.getLogger("downme")
+# A interface consulta a fila a cada segundo; sem isso o log cresceria sem parar.
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
 sys.excepthook = lambda t, v, tb: log.critical("erro não tratado", exc_info=(t, v, tb))
 threading.excepthook = lambda a: log.critical(
     "erro em thread", exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
@@ -42,7 +45,7 @@ import app as backend  # noqa: E402
 def main() -> None:
     log.info("iniciando (frozen=%s, ffmpeg=%s, js=%s)",
              backend.FROZEN, backend.FFMPEG, backend.BASE_OPTS["js_runtimes"])
-    backend.configure(desktop=True)
+    backend.configure(desktop=True, state_file=LOG_DIR / "queue.json")
 
     # Porta 0 = o sistema escolhe uma livre; escuta só em 127.0.0.1.
     server = make_server("127.0.0.1", 0, backend.app, threaded=True)
@@ -51,9 +54,9 @@ def main() -> None:
     webview.create_window(
         "Downme",
         f"http://127.0.0.1:{server.server_port}/",
-        width=720,
-        height=800,
-        min_size=(420, 620),
+        width=880,
+        height=860,
+        min_size=(460, 620),
         background_color="#0e0f13",
     )
     log.info("servidor em 127.0.0.1:%s", server.server_port)

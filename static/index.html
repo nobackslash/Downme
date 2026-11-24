@@ -8,24 +8,26 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* Tudo branco; o único acento é o ciano/verde-água. */
+    /* Tudo branco; o único acento é o ciano/verde-água.
+       Todo texto passa de 4,5:1 sobre o branco (WCAG AA). */
     :root {
       --bg: #ffffff;
       --surface: #ffffff;
-      --sunken: #f1f8f8;
-      --line: #e1eded;
+      --sunken: #eef6f6;
+      --line: #c9dcdc;          /* divisórias e bordas de campo, visíveis sem pesar */
       --ink: #0f2a2e;
-      --muted: #67868a;
-      --cyan: #06b6d4;
-      --teal: #14b8a6;
-      --accent: #0e9aa7;        /* botões e foco: contraste AA com branco */
+      --muted: #4a666b;         /* 6,2:1 */
+      --cyan: #0891b2;
+      --teal: #0d8a7e;
+      --accent: #0a7480;        /* botões e foco: 5,5:1 com branco */
       --accent-ink: #ffffff;
       --braille: #12a9b5;       /* cor do campo braille de progresso */
-      --ok: #0f8a6c;
-      --err: #c2413a;
-      --warn: #8a6100;
-      --warn-bg: #fff8e5;
-      --focus: 0 0 0 3px rgba(14, 154, 167, .3);
+      --ok: #0b7a5e;
+      --err: #b3362f;
+      --warn: #7a5600;
+      --warn-bg: #fff4d6;
+      --focus: 0 0 0 3px rgba(10, 116, 128, .45);
+      --bar-h: 36px;
       --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
       --ui: "Figtree", "Segoe UI", system-ui, sans-serif;
       --mono: "Cascadia Mono", "Cascadia Code", Consolas, "Segoe UI Symbol", monospace;
@@ -37,15 +39,53 @@
     body {
       margin: 0; background: var(--bg); color: var(--ink);
       font: 15px/1.45 var(--ui);
-      display: grid; grid-template-rows: auto auto 1fr auto; grid-template-columns: minmax(0, 1fr);
+      display: flex; flex-direction: column; overflow: hidden;
     }
     :focus { outline: none; }
     :focus-visible { box-shadow: var(--focus); border-radius: 8px; }
 
+    /* ---------- moldura própria (só no app desktop) ---------- */
+    .titlebar {
+      flex: none; height: var(--bar-h); display: flex; align-items: stretch;
+      background: var(--sunken); border-bottom: 1px solid var(--line);
+      user-select: none; -webkit-user-select: none;
+    }
+    .titlebar[hidden] { display: none; }
+    .titlebar .drag {
+      flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+      font: 600 13px var(--ui); color: var(--muted); cursor: default;
+    }
+    .titlebar .drag svg { width: 15px; height: 15px; color: var(--accent); flex: none; }
+    .titlebar .wc {
+      width: 46px; border: 0; padding: 0; background: none; color: var(--ink);
+      display: grid; place-items: center; cursor: default; border-radius: 0;
+    }
+    .titlebar .wc svg { width: 10px; height: 10px; }
+    .titlebar .wc:hover { background: var(--line); }
+    .titlebar .wc:active { background: #b6cccc; }
+    .titlebar .wc.close:hover { background: #c42b1c; color: #fff; }
+    .titlebar .wc.close:active { background: #a42417; color: #fff; }
+    .titlebar .wc:focus-visible { box-shadow: inset var(--focus); border-radius: 0; }
+    .titlebar .restore-ico { display: none; }
+    body.maxed .titlebar .max-ico { display: none; }
+    body.maxed .titlebar .restore-ico { display: block; }
+
+    /* bordas invisíveis para redimensionar (o Windows faz o resto) */
+    .grip { position: fixed; z-index: 50; display: none; }
+    body.framed:not(.maxed) .grip { display: block; }
+    .grip.n  { top: 0; left: 8px; right: 8px; height: 4px; cursor: n-resize; }
+    .grip.s  { bottom: 0; left: 8px; right: 8px; height: 5px; cursor: s-resize; }
+    .grip.w  { left: 0; top: 8px; bottom: 8px; width: 5px; cursor: w-resize; }
+    .grip.e  { right: 0; top: 8px; bottom: 8px; width: 5px; cursor: e-resize; }
+    .grip.nw { left: 0; top: 0; width: 8px; height: 8px; cursor: nw-resize; }
+    .grip.ne { right: 0; top: 0; width: 8px; height: 8px; cursor: ne-resize; }
+    .grip.sw { left: 0; bottom: 0; width: 10px; height: 10px; cursor: sw-resize; }
+    .grip.se { right: 0; bottom: 0; width: 10px; height: 10px; cursor: se-resize; }
+
     /* ---------- entrada ---------- */
     .intake {
       display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 18px; align-items: start;
-      padding: 16px 20px 14px; background: var(--surface); border-bottom: 1px solid var(--line);
+      padding: 16px 20px 14px; background: var(--surface); border-bottom: 1px solid var(--line); flex: none;
     }
     .brand {
       font: 700 26px/1 var(--display); letter-spacing: -.02em; margin: 0; padding-top: 9px;
@@ -66,12 +106,13 @@
     textarea::placeholder { color: var(--muted); }
     textarea:focus { border-color: var(--accent); box-shadow: var(--focus); }
 
-    .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: var(--bg); }
+    .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: var(--sunken); }
     .toggle button {
       border: 0; background: none; color: var(--muted); font: 500 14px var(--ui);
       padding: 7px 12px; border-radius: 7px; cursor: pointer;
     }
-    .toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+    .toggle button:hover { color: var(--ink); }
+    .toggle button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
 
     select {
       font: 500 14px var(--ui); color: var(--ink); background: var(--bg);
@@ -84,9 +125,9 @@
       font: 600 14px var(--ui); border-radius: 10px; padding: 10px 16px; cursor: pointer;
       border: 1px solid transparent; background: var(--accent); color: var(--accent-ink);
     }
-    .btn:hover { filter: brightness(1.08); }
+    .btn:hover { filter: brightness(1.15); }
     .btn:disabled { opacity: .5; cursor: default; filter: none; }
-    .btn.quiet { background: transparent; color: var(--ink); border-color: var(--line); }
+    .btn.quiet { background: var(--surface); color: var(--ink); border-color: var(--line); }
     .btn.quiet:hover { background: var(--sunken); filter: none; }
     .btn.small { padding: 6px 11px; font-size: 13px; border-radius: 8px; }
 
@@ -98,6 +139,7 @@
     }
 
     /* ---------- faixas de aviso ---------- */
+    .strips { flex: none; }
     .strips:empty { display: none; }
     .strip { display: flex; align-items: center; gap: 14px; padding: 9px 20px; font-size: 14px; }
     .strip p { margin: 0; flex: 1; }
@@ -105,7 +147,7 @@
     .strip.paused { background: var(--warn-bg); color: var(--warn); border-bottom: 1px solid var(--line); }
 
     /* ---------- fila ---------- */
-    .queue { overflow-y: auto; min-height: 0; }
+    .queue { flex: 1; overflow-y: auto; min-height: 0; }
     #list { list-style: none; margin: 0; padding: 0; }
 
     .row {
@@ -116,7 +158,7 @@
        enche da esquerda para a direita (desenhado pelo JS, ver braille()). */
     .braille {
       position: absolute; inset: 0; z-index: -1; margin: 0; overflow: hidden;
-      font: 13px/14px var(--mono); color: var(--braille); opacity: .42;
+      font: 13px/14px var(--mono); color: var(--braille); opacity: .38;
       white-space: pre; pointer-events: none; user-select: none;
     }
     .row-in {
@@ -124,7 +166,7 @@
       padding: 12px 20px;
     }
     .row.held { background: var(--sunken); }
-    .row.held .thumb, .row.held .title { opacity: .55; }
+    .row.held .thumb, .row.held .title { opacity: .6; }
     .spin { color: var(--teal); font: 17px/1 var(--mono); display: inline-block; width: 1.2em; vertical-align: -2px; }
 
     .thumb {
@@ -150,7 +192,7 @@
       width: 32px; height: 32px; display: inline-grid; place-items: center;
       border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer;
     }
-    .icon:hover { background: var(--sunken); color: var(--ink); }
+    .icon:hover { background: var(--line); color: var(--ink); }
     .icon svg { width: 18px; height: 18px; }
     .gap { width: 8px; }
 
@@ -163,15 +205,15 @@
     /* ---------- barra de status ---------- */
     .status {
       display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap;
-      padding: 9px 20px; background: var(--surface); border-top: 1px solid var(--line);
-      font-size: 13px; color: var(--muted);
+      padding: 9px 20px; background: var(--sunken); border-top: 1px solid var(--line);
+      font-size: 13px; color: var(--muted); flex: none;
     }
     .status .counts { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
     .status label { display: flex; align-items: center; gap: 6px; }
     .status select { padding: 4px 6px; font-size: 13px; border-radius: 7px; }
     .status .push { margin-left: auto; }
     .status a, .linkish {
-      color: var(--muted); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--line);
+      color: var(--muted); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: currentColor;
       background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
     }
     .status a:hover, .linkish:hover { color: var(--ink); text-decoration-color: currentColor; }
@@ -199,6 +241,27 @@
   </style>
 </head>
 <body>
+  <div class="titlebar" id="titlebar" hidden>
+    <div class="drag" id="dragZone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg>
+      <span>Downme</span>
+    </div>
+    <button type="button" class="wc" data-wc="min" title="Minimizar" aria-label="Minimizar">
+      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0 5.5h10" stroke="currentColor" stroke-width="1"/></svg>
+    </button>
+    <button type="button" class="wc" data-wc="max" title="Maximizar" aria-label="Maximizar">
+      <svg class="max-ico" viewBox="0 0 10 10" aria-hidden="true"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+      <svg class="restore-ico" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 2.5V.5h7v7h-2M.5 2.5h7v7h-7z" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+    </button>
+    <button type="button" class="wc close" data-wc="close" title="Fechar" aria-label="Fechar">
+      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M.5.5l9 9M9.5.5l-9 9" stroke="currentColor" stroke-width="1.1"/></svg>
+    </button>
+  </div>
+  <div class="grip n" data-grip="n"></div><div class="grip s" data-grip="s"></div>
+  <div class="grip w" data-grip="w"></div><div class="grip e" data-grip="e"></div>
+  <div class="grip nw" data-grip="nw"></div><div class="grip ne" data-grip="ne"></div>
+  <div class="grip sw" data-grip="sw"></div><div class="grip se" data-grip="se"></div>
+
   <header class="intake">
     <h1 class="brand">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg>
@@ -692,6 +755,53 @@
   setInterval(tick, calm ? 1000 : 90);
   measureCell();
   if (document.fonts) document.fonts.ready.then(measureCell);
+
+  // ---------- moldura própria (app desktop) ----------
+  // A janela não tem moldura do Windows; arrastar e redimensionar são
+  // repassados ao sistema pelo Python (WindowApi em desktop.py).
+  function setupFrame() {
+    const win = window.pywebview && window.pywebview.api;
+    if (!win || !win.begin || document.body.classList.contains("framed")) return;
+    document.body.classList.add("framed");
+    $("titlebar").hidden = false;
+
+    const setMax = (m) => {
+      document.body.classList.toggle("maxed", !!m);
+      const b = document.querySelector('[data-wc="max"]');
+      b.title = m ? "Restaurar" : "Maximizar"; b.setAttribute("aria-label", b.title);
+    };
+    const toggleMax = () => win.toggle_maximize().then(setMax).catch(() => {});
+
+    let lastDown = 0;
+    $("dragZone").addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastDown < 400) { lastDown = 0; toggleMax(); return; }  // duplo clique
+      lastDown = now;
+      win.begin("move").catch(() => {});
+    });
+    document.querySelectorAll(".grip").forEach((g) => g.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      win.begin(g.dataset.grip).catch(() => {});
+    }));
+    $("titlebar").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-wc]"); if (!b) return;
+      if (b.dataset.wc === "min") win.minimize();
+      else if (b.dataset.wc === "max") toggleMax();
+      else if (b.dataset.wc === "close") win.close();
+    });
+    // maximizar/restaurar também acontece por fora (arrastar, Win+setas)
+    let rt = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(rt);
+      rt = setTimeout(() => win.is_maximized().then(setMax).catch(() => {}), 120);
+    });
+    win.is_maximized().then(setMax).catch(() => {});
+  }
+  window.addEventListener("pywebviewready", setupFrame);
+  setupFrame();
 
   // ---------- polling ----------
   async function refresh() {
